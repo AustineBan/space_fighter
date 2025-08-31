@@ -29,9 +29,17 @@ class Particle:
     def __init__(self):
         self.x = random.randint(0, WIDTH)
         self.y = random.randint(0, HEIGHT)
-        self.speed = random.uniform(0.5, 2.5) 
         self.size = random.randint(1, 3)
-        self.color = (random.randint(150, 255), random.randint(150, 255), random.randint(150, 255))
+
+        if self.size == 1:
+            self.speed = random.uniform(0.5, 1.5) 
+            self.color = (random.randint(50, 90), random.randint(50, 90), random.randint(50, 90))
+        elif self.size == 2:
+            self.speed = random.uniform(1, 2) 
+            self.color = (random.randint(80, 130), random.randint(80, 130), random.randint(80, 130))
+        else:
+            self.speed = random.uniform(1.5, 2.5) 
+            self.color = (random.randint(120, 170), random.randint(120, 170), random.randint(120, 170))
 
 
 def draw(player, time_passed, obstacles, bullets, particles, user_score):
