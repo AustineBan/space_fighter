@@ -13,8 +13,8 @@ WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("SPACE FIGHTER")
 
 #OBSTACLE
-OBSTACLE_WIDTH = 22
-OBSTACLE_HEIGHT = 15
+OBSTACLE_WIDTH = 32
+OBSTACLE_HEIGHT = 45
 OBSTACLE_VELOCITY = 6
 
 #Bullet
@@ -40,6 +40,11 @@ PLAYER_IMAGES = {
 # Exhaust Fire Animation Frames
 FIRE_FRAMES = [
     pygame.transform.scale(pygame.image.load(f"assets/player/exhaust/Exhaust_0{i}.png"), (PLAYER_WIDTH, 30)) for i in range(1, 7)
+]
+
+OBSTALCE_IMAGE = pygame.transform.scale(pygame.image.load("assets/obstacle/obstacle.png"), (OBSTACLE_WIDTH, OBSTACLE_HEIGHT))
+OBSTACLE_FIRE_FRAMES = [
+    pygame.transform.scale(pygame.image.load(f"assets/obstacle/Exhaust_0{i}.png"), (OBSTACLE_WIDTH, 30)) for i in range(1, 7)
 ]
 
 # Load Laser Image
@@ -76,7 +81,9 @@ def draw(player, time_passed, obstacles, bullets, particles, user_score, current
         # pygame.draw.rect(WIN, 'white', bullet)
         WIN.blit(LASER_IMAGE, bullet)
     for obstacle in obstacles:
-        pygame.draw.rect(WIN, 'red', obstacle)
+        WIN.blit(OBSTACLE_FIRE_FRAMES[current_fire_frame], (obstacle.x, obstacle.y))
+        # pygame.draw.rect(WIN, 'red', obstacle)
+        WIN.blit(OBSTALCE_IMAGE, obstacle)
     # pygame.draw.rect(WIN, 'orange', player)
     WIN.blit(FIRE_FRAMES[current_fire_frame], (player.x, player.y + player.height-15))
     WIN.blit(PLAYER_IMAGES[player_direction], (player.x, player.y))
@@ -93,6 +100,9 @@ def main():
     obstacle_increment = 310
     obstacle_timing = 0
     obstacles = []
+
+    shoot_cooldown = 0   
+    shoot_delay = 100  
 
     # Fire animation variables
     fire_animation_frames = 6
@@ -118,7 +128,8 @@ def main():
     pygame.mixer.music.load('assets/bg_music.mp3')
     pygame.mixer.music.play(-1)
     while run:
-        obstacle_timing += clock.tick(FPS)
+        dt = clock.tick(FPS)
+        obstacle_timing += dt
         time_passed = (pygame.time.get_ticks() - started_time) / 1000
 
         fire_frame_timer += 1
@@ -165,9 +176,21 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
                 break
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                bullet = pygame.Rect(player.centerx - BULLET_WIDTH // 2, player.top, BULLET_WIDTH, BULLET_HEIGHT)
-                bullets.append(bullet)
+            # if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+            #     bullet = pygame.Rect(player.centerx - BULLET_WIDTH // 2, player.top, BULLET_WIDTH, BULLET_HEIGHT)
+            #     bullets.append(bullet)
+
+        # reduce cooldown
+        if shoot_cooldown > 0:
+            shoot_cooldown -= dt
+
+        keys = pygame.key.get_pressed()
+
+        # --- Continuous shooting ---
+        if keys[pygame.K_SPACE] and shoot_cooldown <= 0:
+            bullet = pygame.Rect(player.centerx - BULLET_WIDTH // 2, player.top, BULLET_WIDTH, BULLET_HEIGHT)
+            bullets.append(bullet)
+            shoot_cooldown = shoot_delay   # reset cooldown
 
 
        # Inside the while run: loop
