@@ -138,6 +138,11 @@ def main():
         if keys[pygame.K_RIGHT] and player.x + PLAYER_VELOCITY + player.width <= WIDTH:
             player.x += PLAYER_VELOCITY
 
+        if keys[pygame.K_UP] and player.y - PLAYER_VELOCITY >= 0:
+            player.y -= PLAYER_VELOCITY
+        if keys[pygame.K_DOWN] and player.y + PLAYER_VELOCITY + player.height <= HEIGHT:
+            player.y += PLAYER_VELOCITY
+
         for obstacle in obstacles[:]:
             obstacle.y += current_obstacle_velocity
             if obstacle.y > HEIGHT:
