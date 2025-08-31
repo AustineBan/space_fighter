@@ -34,12 +34,14 @@ class Particle:
         self.color = (random.randint(150, 255), random.randint(150, 255), random.randint(150, 255))
 
 
-def draw(player, time_passed, obstacles, bullets, particles):
+def draw(player, time_passed, obstacles, bullets, particles, user_score):
     WIN.fill((0, 0, 0))
     for particle in particles:
         pygame.draw.circle(WIN, particle.color, (int(particle.x), int(particle.y)), particle.size)
-    time_text = FONT.render(f"{round(time_passed)}", 1, "yellow")
+    time_text = FONT.render(f"Time: {round(time_passed)}", 1, "yellow")
     WIN.blit(time_text, (10, 10))
+    user_score_text = FONT.render(f"Kills {user_score}", 1, "yellow")
+    WIN.blit(user_score_text, (WIDTH - user_score_text.get_width() - 10, 10))
     for bullet in bullets:
         pygame.draw.rect(WIN, 'white', bullet)
     for obstacle in obstacles:
@@ -51,7 +53,7 @@ def main():
     clock = pygame.time.Clock()
     started_time = pygame.time.get_ticks()
     time_passed = 0
-    
+    user_score = 0
 
     obstacle_increment = 310
     obstacle_timing = 0
@@ -92,6 +94,7 @@ def main():
 
             for obstacle in obstacles[:]:
                 if bullet.colliderect(obstacle):
+                    user_score += 1
                     if bullet in bullets:
                         obstacles.remove(obstacle)
                         bullets.remove(bullet)
@@ -122,7 +125,7 @@ def main():
                 obstacles.remove(obstacle)
                 break
 
-        draw(player, time_passed, obstacles, bullets, particles)
+        draw(player, time_passed, obstacles, bullets, particles, user_score)
 
 
     pygame.quit()
