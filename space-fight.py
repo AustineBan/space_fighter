@@ -4,7 +4,7 @@ import random
 pygame.font.init()
 pygame.mixer.init()
 
-WIDTH, HEIGHT = 1000, 700
+WIDTH ,HEIGHT = 1000, 700
 PLAYER_HEIGHT = 40
 PLAYER_WIDTH = 70
 PLAYER_VELOCITY = 10
@@ -22,30 +22,22 @@ BULLET_WIDTH = 5
 BULLET_HEIGHT = 10
 BULLET_VELOCITY = 15
 
-# We will no longer need the static background image
-# BG = pygame.transform.scale(pygame.image.load("assets/bg.png"), (WIDTH, HEIGHT))
+BG = pygame.transform.scale(pygame.image.load("assets/bg.png"), (WIDTH, HEIGHT))
 FONT = pygame.font.SysFont("Times New Roman", 30)
 
 class Particle:
     def __init__(self):
         self.x = random.randint(0, WIDTH)
         self.y = random.randint(0, HEIGHT)
-        # Give particles different speeds for a parallax effect
         self.speed = random.uniform(0.5, 2.5) 
-        # Give particles different sizes
         self.size = random.randint(1, 3)
-        # Give particles slightly different shades of grey/white
         self.color = (random.randint(150, 255), random.randint(150, 255), random.randint(150, 255))
 
 
 def draw(player, time_passed, obstacles, bullets, particles):
-    # Fill the screen with black instead of blitting a static image
     WIN.fill((0, 0, 0))
-
-    # Draw the star particles
     for particle in particles:
         pygame.draw.circle(WIN, particle.color, (int(particle.x), int(particle.y)), particle.size)
-
     time_text = FONT.render(f"{round(time_passed)}", 1, "yellow")
     WIN.blit(time_text, (10, 10))
     for bullet in bullets:
@@ -59,27 +51,32 @@ def main():
     clock = pygame.time.Clock()
     started_time = pygame.time.get_ticks()
     time_passed = 0
+    
 
     obstacle_increment = 310
     obstacle_timing = 0
     obstacles = []
 
     bullets = []
-
-    # Create a list to hold the star particles
     particles = []
-    for _ in range(250):  # You can adjust this number for more or fewer stars
+
+    for _ in range(250):
         particles.append(Particle())
-        
+
     run = True
     player = pygame.Rect(200, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
 
     pygame.mixer.music.load('assets/bg_music.mp3')
     pygame.mixer.music.play(-1)
-    
     while run:
         obstacle_timing += clock.tick(FPS)
         time_passed = (pygame.time.get_ticks() - started_time) / 1000
+
+        for particle in particles:
+            particle.y += particle.speed
+            if particle.y > HEIGHT:
+                particle.y = 0
+                particle.x = random.randint(0, WIDTH)
 
         if obstacle_timing > obstacle_increment:
             for i in range(3):
@@ -87,13 +84,6 @@ def main():
                 obstacle = pygame.Rect(obstacle_x, -OBSTACLE_HEIGHT, OBSTACLE_WIDTH, OBSTACLE_HEIGHT)
                 obstacles.append(obstacle)
             obstacle_timing = 0
-        
-        # Update and wrap the star particles
-        for particle in particles:
-            particle.y += particle.speed
-            if particle.y > HEIGHT:
-                particle.y = 0
-                particle.x = random.randint(0, WIDTH)
 
         for bullet in bullets:
             bullet.y -= BULLET_VELOCITY
@@ -132,11 +122,12 @@ def main():
                 obstacles.remove(obstacle)
                 break
 
-        # Pass the particle list to the draw function
         draw(player, time_passed, obstacles, bullets, particles)
 
 
     pygame.quit()
+
+
 
 
 if __name__ == "__main__":
