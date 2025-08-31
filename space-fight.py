@@ -67,6 +67,12 @@ def main():
     obstacle_timing = 0
     obstacles = []
 
+    # Variables for progressive difficulty
+    current_obstacle_velocity = OBSTACLE_VELOCITY
+    current_obstacle_count = 2
+    difficulty_level = 0
+    difficulty_level_count = 0
+
     bullets = []
     particles = []
 
@@ -82,6 +88,15 @@ def main():
         obstacle_timing += clock.tick(FPS)
         time_passed = (pygame.time.get_ticks() - started_time) / 1000
 
+        DIF_NUM = 10
+        if time_passed // DIF_NUM > difficulty_level:
+            difficulty_level += 1
+            current_obstacle_velocity += 0.8
+
+        if (time_passed // (DIF_NUM * 4)) > difficulty_level_count:
+            difficulty_level_count += 1
+            current_obstacle_count += 1
+
         for particle in particles:
             particle.y += particle.speed
             if particle.y > HEIGHT:
@@ -89,7 +104,7 @@ def main():
                 particle.x = random.randint(0, WIDTH)
 
         if obstacle_timing > obstacle_increment:
-            for i in range(3):
+            for i in range(current_obstacle_count):
                 obstacle_x = random.randint(0, WIDTH - OBSTACLE_WIDTH)
                 obstacle = pygame.Rect(obstacle_x, -OBSTACLE_HEIGHT, OBSTACLE_WIDTH, OBSTACLE_HEIGHT)
                 obstacles.append(obstacle)
@@ -124,7 +139,7 @@ def main():
             player.x += PLAYER_VELOCITY
 
         for obstacle in obstacles[:]:
-            obstacle.y += OBSTACLE_VELOCITY
+            obstacle.y += current_obstacle_velocity
             if obstacle.y > HEIGHT:
                 obstacles.remove(obstacle)
             
