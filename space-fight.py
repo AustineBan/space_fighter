@@ -23,6 +23,28 @@ BULLET_HEIGHT = 10
 BULLET_VELOCITY = 15
 
 BG = pygame.transform.scale(pygame.image.load("assets/bg.png"), (WIDTH, HEIGHT))
+
+# PLAYER_WIDTH and PLAYER_HEIGHT must match your images
+PLAYER_WIDTH = 64
+PLAYER_HEIGHT = 70
+
+# Player Images
+PLAYER_IMAGES = {
+    "middle": pygame.transform.scale(pygame.image.load("assets/player/character/PlayerBlue_middle.png"), (PLAYER_WIDTH, PLAYER_HEIGHT)),
+    "left": pygame.transform.scale(pygame.image.load("assets/player/character/PlayerBlue_left.png"), (PLAYER_WIDTH, PLAYER_HEIGHT)),
+    "left_left": pygame.transform.scale(pygame.image.load("assets/player/character/PlayerBlue_left_left.png"), (PLAYER_WIDTH, PLAYER_HEIGHT)),
+    "right": pygame.transform.scale(pygame.image.load("assets/player/character/PlayerBlue_right.png"), (PLAYER_WIDTH, PLAYER_HEIGHT)),
+    "right_right": pygame.transform.scale(pygame.image.load("assets/player/character/PlayerBlue_right_right.png"), (PLAYER_WIDTH, PLAYER_HEIGHT))
+}
+
+# Exhaust Fire Animation Frames
+FIRE_FRAMES = [
+    pygame.transform.scale(pygame.image.load(f"assets/player/exhaust/Exhaust_0{i}.png"), (PLAYER_WIDTH, 30)) for i in range(1, 7)
+]
+
+# Load Laser Image
+LASER_IMAGE = pygame.transform.scale(pygame.image.load("assets/player/LaserBlue.png"), (BULLET_WIDTH, BULLET_HEIGHT))
+
 FONT = pygame.font.SysFont("Times New Roman", 30)
 
 class Particle:
@@ -42,7 +64,7 @@ class Particle:
             self.color = (random.randint(120, 170), random.randint(120, 170), random.randint(120, 170))
 
 
-def draw(player, time_passed, obstacles, bullets, particles, user_score):
+def draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame, player_direction):
     WIN.fill((0, 0, 0))
     for particle in particles:
         pygame.draw.circle(WIN, particle.color, (int(particle.x), int(particle.y)), particle.size)
@@ -51,10 +73,13 @@ def draw(player, time_passed, obstacles, bullets, particles, user_score):
     user_score_text = FONT.render(f"Kills {user_score}", 1, "yellow")
     WIN.blit(user_score_text, (WIDTH - user_score_text.get_width() - 10, 10))
     for bullet in bullets:
-        pygame.draw.rect(WIN, 'white', bullet)
+        # pygame.draw.rect(WIN, 'white', bullet)
+        WIN.blit(LASER_IMAGE, bullet)
     for obstacle in obstacles:
         pygame.draw.rect(WIN, 'red', obstacle)
-    pygame.draw.rect(WIN, 'orange', player)
+    # pygame.draw.rect(WIN, 'orange', player)
+    WIN.blit(FIRE_FRAMES[current_fire_frame], (player.x, player.y + player.height-15))
+    WIN.blit(PLAYER_IMAGES[player_direction], (player.x, player.y))
     pygame.display.update()
 
 def main():
@@ -63,9 +88,17 @@ def main():
     time_passed = 0
     user_score = 0
 
+    player_direction = "middle"
+
     obstacle_increment = 310
     obstacle_timing = 0
     obstacles = []
+
+    # Fire animation variables
+    fire_animation_frames = 6
+    fire_animation_speed = 1
+    current_fire_frame = 0
+    fire_frame_timer = 0
 
     # Variables for progressive difficulty
     current_obstacle_velocity = OBSTACLE_VELOCITY
@@ -87,6 +120,11 @@ def main():
     while run:
         obstacle_timing += clock.tick(FPS)
         time_passed = (pygame.time.get_ticks() - started_time) / 1000
+
+        fire_frame_timer += 1
+        if fire_frame_timer > fire_animation_speed:
+            current_fire_frame = (current_fire_frame + 1) % fire_animation_frames
+            fire_frame_timer = 0
 
         DIF_NUM = 10
         if time_passed // DIF_NUM > difficulty_level:
@@ -132,16 +170,32 @@ def main():
                 bullets.append(bullet)
 
 
+       # Inside the while run: loop
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT] and player.x - PLAYER_VELOCITY >= 0:
+        player_direction = "middle"  # Default to middle view if no keys are pressed
+
+        if keys[pygame.K_LEFT]:
+            if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                player_direction = "left_left"
+            else:
+                player_direction = "left"
             player.x -= PLAYER_VELOCITY
-        if keys[pygame.K_RIGHT] and player.x + PLAYER_VELOCITY + player.width <= WIDTH:
+        elif keys[pygame.K_RIGHT]:
+            if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                player_direction = "right_right"
+            else:
+                player_direction = "right"
             player.x += PLAYER_VELOCITY
 
-        if keys[pygame.K_UP] and player.y - PLAYER_VELOCITY >= 0:
+        # The rest of your movement code (for up and down) goes here
+        if keys[pygame.K_UP]:
             player.y -= PLAYER_VELOCITY
-        if keys[pygame.K_DOWN] and player.y + PLAYER_VELOCITY + player.height <= HEIGHT:
+        if keys[pygame.K_DOWN]:
             player.y += PLAYER_VELOCITY
+
+        # Boundary checks to prevent the player from leaving the screen
+        player.x = max(0, min(player.x, WIDTH - player.width))
+        player.y = max(0, min(player.y, HEIGHT - player.height))
 
         for obstacle in obstacles[:]:
             obstacle.y += current_obstacle_velocity
@@ -153,7 +207,7 @@ def main():
                 obstacles.remove(obstacle)
                 break
 
-        draw(player, time_passed, obstacles, bullets, particles, user_score)
+        draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame=current_fire_frame, player_direction=player_direction)
 
 
     pygame.quit()
