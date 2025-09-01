@@ -27,6 +27,7 @@ BULLET_WIDTH = 5
 BULLET_HEIGHT = 10
 BULLET_VELOCITY = 15
 
+# 
 BG = pygame.transform.scale(pygame.image.load("assets/bg.png"), (WIDTH, HEIGHT))
 
 # PLAYER_WIDTH and PLAYER_HEIGHT must match your images
@@ -81,6 +82,7 @@ class Particle:
             self.speed = random.uniform(1.5, 2.5) 
             self.color = (random.randint(120, 220), random.randint(120, 220), random.randint(120, 220))
 
+
 def draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame, player_direction, player_live):
     WIN.fill((0, 0, 30))
     for particle in particles:
@@ -102,28 +104,12 @@ def draw(player, time_passed, obstacles, bullets, particles, user_score, current
     WIN.blit(lives_text, lives_text_rect)
     pygame.display.update()
 
-def load_high_scores():
-    """Loads high scores from a JSON file, or creates a default if none exists."""
-    if os.path.exists(HIGH_SCORE_FILE):
-        with open(HIGH_SCORE_FILE, "r") as f:
-            return json.load(f)
-    return {
-        "kills_record": {"score": 0, "name": "N/A"},
-        "time_record": {"score": 0, "name": "N/A"}
-    }
-
-def save_high_scores(scores):
-    """Saves the high score dictionary to a JSON file."""
-    with open(HIGH_SCORE_FILE, "w") as f:
-        json.dump(scores, f, indent=4)
-
 def show_game_over_screen(final_score, final_time):
     """Displays the game over screen with scores, high scores, and buttons."""
     high_scores = load_high_scores()
     new_kills_record = False
     new_time_record = False
 
-    # Check for new high scores and update
     if final_score > high_scores["kills_record"]["score"]:
         new_kills_record = True
         high_scores["kills_record"]["score"] = final_score
@@ -132,7 +118,6 @@ def show_game_over_screen(final_score, final_time):
         new_time_record = True
         high_scores["time_record"]["score"] = final_time
     
-    # Get player name if they have a new high score
     player_name = "N/A"
     if new_kills_record or new_time_record:
         name_prompt = FONT.render("New High Score! Enter your name:", True, "white")
@@ -233,44 +218,51 @@ def show_game_over_screen(final_score, final_time):
                     return False
     return False
 
+def load_high_scores():
+    if os.path.exists(HIGH_SCORE_FILE):
+        with open(HIGH_SCORE_FILE, "r") as f:
+            return json.load(f)
+    return {
+        "kills_record": {"score": 0, "name": "N/A"},
+        "time_record": {"score": 0, "name": "N/A"}
+    }
+
+def save_high_scores(scores):
+    with open(HIGH_SCORE_FILE, "w") as f:
+        json.dump(scores, f, indent=4)
+
 def main():
+    
     while True:
         clock = pygame.time.Clock()
         started_time = pygame.time.get_ticks()
         time_passed = 0
         user_score = 0
-        player_live = PLAYERS_LIVES
-
         player_direction = "middle"
-
         obstacle_increment = 310
         obstacle_timing = 0
         obstacles = []
-
-        shoot_cooldown = 0   
-        shoot_delay = 100   
-
+        shoot_cooldown = 0
+        shoot_delay = 100
+        player_live = PLAYERS_LIVES
         fire_animation_frames = 6
         fire_animation_speed = 1
         current_fire_frame = 0
         fire_frame_timer = 0
-
         current_obstacle_velocity = OBSTACLE_VELOCITY
         current_obstacle_count = 2
         difficulty_level = 0
         difficulty_level_count = 0
-
         bullets = []
         particles = []
-
         for _ in range(250):
             particles.append(Particle())
-
-        run = True
-        player = pygame.Rect(WIDTH // 2 - PLAYER_WIDTH // 2, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
-
+        player = pygame.Rect(200, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
+        
         pygame.mixer.music.load('assets/audio/music/bg_music.mid')
         pygame.mixer.music.play(-1)
+        
+        run = True
         while run:
             dt = clock.tick(FPS)
             obstacle_timing += dt
@@ -320,20 +312,23 @@ def main():
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
-                    
+                    break
+            
+            # reduce cooldown
             if shoot_cooldown > 0:
                 shoot_cooldown -= dt
 
             keys = pygame.key.get_pressed()
 
+            # --- Continuous shooting ---
             if keys[pygame.K_SPACE] and shoot_cooldown <= 0:
                 SHOT_FX.play()
                 bullet = pygame.Rect(player.centerx - BULLET_WIDTH // 2, player.top, BULLET_WIDTH, BULLET_HEIGHT)
                 bullets.append(bullet)
                 shoot_cooldown = shoot_delay
 
+            keys = pygame.key.get_pressed()
             player_direction = "middle"
-
             if keys[pygame.K_LEFT]:
                 if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
                     player_direction = "left_left"
@@ -374,6 +369,7 @@ def main():
             break
 
     pygame.quit()
+
 
 if __name__ == "__main__":
     main()
