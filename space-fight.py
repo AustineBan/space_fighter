@@ -28,6 +28,8 @@ BG = pygame.transform.scale(pygame.image.load("assets/bg.png"), (WIDTH, HEIGHT))
 PLAYER_WIDTH = 64
 PLAYER_HEIGHT = 70
 
+HEART_FONT = pygame.font.SysFont("Segoe UI Emoji", 30)
+
 # Player Images
 PLAYER_IMAGES = {
     "middle": pygame.transform.scale(pygame.image.load("assets/player/character/PlayerBlue_middle.png"), (PLAYER_WIDTH, PLAYER_HEIGHT)),
@@ -52,6 +54,13 @@ LASER_IMAGE = pygame.transform.scale(pygame.image.load("assets/player/LaserBlue.
 
 FONT = pygame.font.SysFont("Times New Roman", 30)
 
+# SHOT_FX = pygame.mixer.Sound("assets/audio/sound/shot.wav")
+SHOT_FX = pygame.mixer.Sound("assets/audio/sound/shot.ogg")
+SHOT_FX.set_volume(0.8)
+EXPLOSION_FX = pygame.mixer.Sound("assets/audio/sound/explosion.wav")
+HIT_FX = pygame.mixer.Sound("assets/audio/sound/hit.wav")
+PLAYERS_LIVES = 5
+
 class Particle:
     def __init__(self):
         self.x = random.randint(0, WIDTH)
@@ -60,17 +69,17 @@ class Particle:
 
         if self.size == 1:
             self.speed = random.uniform(0.5, 1.5) 
-            self.color = (random.randint(50, 90), random.randint(50, 90), random.randint(50, 90))
+            self.color = (random.randint(50, 100), random.randint(50, 100), random.randint(50, 100))
         elif self.size == 2:
             self.speed = random.uniform(1, 2) 
-            self.color = (random.randint(80, 130), random.randint(80, 130), random.randint(80, 130))
+            self.color = (random.randint(80, 170), random.randint(80, 170), random.randint(80, 170))
         else:
             self.speed = random.uniform(1.5, 2.5) 
-            self.color = (random.randint(120, 170), random.randint(120, 170), random.randint(120, 170))
+            self.color = (random.randint(120, 220), random.randint(120, 220), random.randint(120, 220))
 
 
-def draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame, player_direction):
-    WIN.fill((0, 0, 0))
+def draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame, player_direction, player_live):
+    WIN.fill((0, 0, 30))
     for particle in particles:
         pygame.draw.circle(WIN, particle.color, (int(particle.x), int(particle.y)), particle.size)
     time_text = FONT.render(f"Time: {round(time_passed)}", 1, "yellow")
@@ -87,6 +96,10 @@ def draw(player, time_passed, obstacles, bullets, particles, user_score, current
     # pygame.draw.rect(WIN, 'orange', player)
     WIN.blit(FIRE_FRAMES[current_fire_frame], (player.x, player.y + player.height-15))
     WIN.blit(PLAYER_IMAGES[player_direction], (player.x, player.y))
+
+    lives_text = HEART_FONT.render("❤️" * player_live, True, "red")
+    lives_text_rect = lives_text.get_rect(center=(WIDTH/2, 25))
+    WIN.blit(lives_text, lives_text_rect)
     pygame.display.update()
 
 def main():
@@ -103,6 +116,7 @@ def main():
 
     shoot_cooldown = 0   
     shoot_delay = 100  
+    player_live = PLAYERS_LIVES
 
     # Fire animation variables
     fire_animation_frames = 6
@@ -125,7 +139,7 @@ def main():
     run = True
     player = pygame.Rect(200, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
 
-    pygame.mixer.music.load('assets/bg_music.mp3')
+    pygame.mixer.music.load('assets/audio/music/bg_music.mid')
     pygame.mixer.music.play(-1)
     while run:
         dt = clock.tick(FPS)
@@ -167,6 +181,7 @@ def main():
             for obstacle in obstacles[:]:
                 if bullet.colliderect(obstacle):
                     user_score += 1
+                    HIT_FX.play()
                     if bullet in bullets:
                         obstacles.remove(obstacle)
                         bullets.remove(bullet)
@@ -188,6 +203,7 @@ def main():
 
         # --- Continuous shooting ---
         if keys[pygame.K_SPACE] and shoot_cooldown <= 0:
+            SHOT_FX.play()
             bullet = pygame.Rect(player.centerx - BULLET_WIDTH // 2, player.top, BULLET_WIDTH, BULLET_HEIGHT)
             bullets.append(bullet)
             shoot_cooldown = shoot_delay   # reset cooldown
@@ -226,11 +242,14 @@ def main():
                 obstacles.remove(obstacle)
             
             elif obstacle.y >= player.y and obstacle.colliderect(player):
-                #Game Over
+                EXPLOSION_FX.play()
                 obstacles.remove(obstacle)
+                player_live -= 1
+                if player_live <= 0:
+                    pass #Game Over
                 break
 
-        draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame=current_fire_frame, player_direction=player_direction)
+        draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame=current_fire_frame, player_direction=player_direction, player_live=player_live)
 
 
     pygame.quit()
