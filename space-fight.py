@@ -1,6 +1,8 @@
 import pygame
 import time
 import random
+import os
+import json
 pygame.font.init()
 pygame.mixer.init()
 
@@ -11,6 +13,9 @@ PLAYER_VELOCITY = 10
 FPS = 60
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("SPACE FIGHTER")
+
+# High Score File Path
+HIGH_SCORE_FILE = "high_scores.json"
 
 #OBSTACLE
 OBSTACLE_WIDTH = 32
@@ -54,7 +59,6 @@ LASER_IMAGE = pygame.transform.scale(pygame.image.load("assets/player/LaserBlue.
 
 FONT = pygame.font.SysFont("Times New Roman", 30)
 
-# SHOT_FX = pygame.mixer.Sound("assets/audio/sound/shot.wav")
 SHOT_FX = pygame.mixer.Sound("assets/audio/sound/shot.ogg")
 SHOT_FX.set_volume(0.8)
 EXPLOSION_FX = pygame.mixer.Sound("assets/audio/sound/explosion.wav")
@@ -77,7 +81,6 @@ class Particle:
             self.speed = random.uniform(1.5, 2.5) 
             self.color = (random.randint(120, 220), random.randint(120, 220), random.randint(120, 220))
 
-
 def draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame, player_direction, player_live):
     WIN.fill((0, 0, 30))
     for particle in particles:
@@ -87,13 +90,10 @@ def draw(player, time_passed, obstacles, bullets, particles, user_score, current
     user_score_text = FONT.render(f"Kills {user_score}", 1, "yellow")
     WIN.blit(user_score_text, (WIDTH - user_score_text.get_width() - 10, 10))
     for bullet in bullets:
-        # pygame.draw.rect(WIN, 'white', bullet)
         WIN.blit(LASER_IMAGE, bullet)
     for obstacle in obstacles:
         WIN.blit(OBSTACLE_FIRE_FRAMES[current_fire_frame], (obstacle.x, obstacle.y))
-        # pygame.draw.rect(WIN, 'red', obstacle)
         WIN.blit(OBSTALCE_IMAGE, obstacle)
-    # pygame.draw.rect(WIN, 'orange', player)
     WIN.blit(FIRE_FRAMES[current_fire_frame], (player.x, player.y + player.height-15))
     WIN.blit(PLAYER_IMAGES[player_direction], (player.x, player.y))
 
@@ -102,160 +102,278 @@ def draw(player, time_passed, obstacles, bullets, particles, user_score, current
     WIN.blit(lives_text, lives_text_rect)
     pygame.display.update()
 
-def main():
-    clock = pygame.time.Clock()
-    started_time = pygame.time.get_ticks()
-    time_passed = 0
-    user_score = 0
+def load_high_scores():
+    """Loads high scores from a JSON file, or creates a default if none exists."""
+    if os.path.exists(HIGH_SCORE_FILE):
+        with open(HIGH_SCORE_FILE, "r") as f:
+            return json.load(f)
+    return {
+        "kills_record": {"score": 0, "name": "N/A"},
+        "time_record": {"score": 0, "name": "N/A"}
+    }
 
-    player_direction = "middle"
+def save_high_scores(scores):
+    """Saves the high score dictionary to a JSON file."""
+    with open(HIGH_SCORE_FILE, "w") as f:
+        json.dump(scores, f, indent=4)
 
-    obstacle_increment = 310
-    obstacle_timing = 0
-    obstacles = []
+def show_game_over_screen(final_score, final_time):
+    """Displays the game over screen with scores, high scores, and buttons."""
+    high_scores = load_high_scores()
+    new_kills_record = False
+    new_time_record = False
 
-    shoot_cooldown = 0   
-    shoot_delay = 100  
-    player_live = PLAYERS_LIVES
+    # Check for new high scores and update
+    if final_score > high_scores["kills_record"]["score"]:
+        new_kills_record = True
+        high_scores["kills_record"]["score"] = final_score
+    
+    if final_time > high_scores["time_record"]["score"]:
+        new_time_record = True
+        high_scores["time_record"]["score"] = final_time
+    
+    # Get player name if they have a new high score
+    player_name = "N/A"
+    if new_kills_record or new_time_record:
+        name_prompt = FONT.render("New High Score! Enter your name:", True, "white")
+        name_prompt_rect = name_prompt.get_rect(center=(WIDTH/2, HEIGHT/2 - 100))
+        name_input = ""
+        input_rect = pygame.Rect(WIDTH/2 - 100, HEIGHT/2 - 50, 200, 40)
+        active = True
 
-    # Fire animation variables
-    fire_animation_frames = 6
-    fire_animation_speed = 1
-    current_fire_frame = 0
-    fire_frame_timer = 0
+        while active:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    return False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN:
+                        active = False
+                    elif event.key == pygame.K_BACKSPACE:
+                        name_input = name_input[:-1]
+                    else:
+                        name_input += event.unicode
+            
+            WIN.fill((0, 0, 30))
+            WIN.blit(name_prompt, name_prompt_rect)
+            pygame.draw.rect(WIN, "white", input_rect, 2)
+            name_surface = FONT.render(name_input, True, "white")
+            WIN.blit(name_surface, (input_rect.x + 5, input_rect.y + 5))
+            pygame.display.update()
+        
+        player_name = name_input.strip() if name_input.strip() else "Anonymous"
+        
+        if new_kills_record:
+            high_scores["kills_record"]["name"] = player_name
+        if new_time_record:
+            high_scores["time_record"]["name"] = player_name
+        
+    save_high_scores(high_scores)
 
-    # Variables for progressive difficulty
-    current_obstacle_velocity = OBSTACLE_VELOCITY
-    current_obstacle_count = 2
-    difficulty_level = 0
-    difficulty_level_count = 0
+    # Game Over screen loop
+    game_over_loop = True
+    while game_over_loop:
+        WIN.fill((0, 0, 30))
+        
+        # Display Final Score
+        game_over_text = FONT.render("GAME OVER", True, "red")
+        game_over_rect = game_over_text.get_rect(center=(WIDTH/2, HEIGHT/2 - 150))
+        WIN.blit(game_over_text, game_over_rect)
 
-    bullets = []
-    particles = []
+        final_score_text = FONT.render(f"Final Kills: {final_score} | Time Survived: {round(final_time)}s", True, "white")
+        final_score_rect = final_score_text.get_rect(center=(WIDTH/2, HEIGHT/2 - 80))
+        WIN.blit(final_score_text, final_score_rect)
 
-    for _ in range(250):
-        particles.append(Particle())
+        # Display High Scores
+        high_score_title = FONT.render("High Scores", True, "gold")
+        high_score_title_rect = high_score_title.get_rect(center=(WIDTH/2, HEIGHT/2 - 20))
+        WIN.blit(high_score_title, high_score_title_rect)
 
-    run = True
-    player = pygame.Rect(200, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
+        kills_record_text = FONT.render(
+            f"Highest Kills: {high_scores['kills_record']['score']} by {high_scores['kills_record']['name']}",
+            True, "white"
+        )
+        kills_record_rect = kills_record_text.get_rect(center=(WIDTH/2, HEIGHT/2 + 20))
+        WIN.blit(kills_record_text, kills_record_rect)
 
-    pygame.mixer.music.load('assets/audio/music/bg_music.mid')
-    pygame.mixer.music.play(-1)
-    while run:
-        dt = clock.tick(FPS)
-        obstacle_timing += dt
-        time_passed = (pygame.time.get_ticks() - started_time) / 1000
+        time_record_text = FONT.render(
+            f"Longest Time: {round(high_scores['time_record']['score'])}s by {high_scores['time_record']['name']}",
+            True, "white"
+        )
+        time_record_rect = time_record_text.get_rect(center=(WIDTH/2, HEIGHT/2 + 50))
+        WIN.blit(time_record_text, time_record_rect)
+        
+        # Draw buttons
+        restart_button = pygame.Rect(WIDTH/2 - 150, HEIGHT/2 + 120, 140, 50)
+        close_button = pygame.Rect(WIDTH/2 + 10, HEIGHT/2 + 120, 140, 50)
 
-        fire_frame_timer += 1
-        if fire_frame_timer > fire_animation_speed:
-            current_fire_frame = (current_fire_frame + 1) % fire_animation_frames
-            fire_frame_timer = 0
+        pygame.draw.rect(WIN, (50, 200, 50), restart_button)
+        pygame.draw.rect(WIN, (200, 50, 50), close_button)
 
-        DIF_NUM = 10
-        if time_passed // DIF_NUM > difficulty_level:
-            difficulty_level += 1
-            current_obstacle_velocity += 0.8
+        restart_text = FONT.render("Restart", True, "white")
+        close_text = FONT.render("Close", True, "white")
+        
+        restart_text_rect = restart_text.get_rect(center=restart_button.center)
+        close_text_rect = close_text.get_rect(center=close_button.center)
+        
+        WIN.blit(restart_text, restart_text_rect)
+        WIN.blit(close_text, close_text_rect)
 
-        if (time_passed // (DIF_NUM * 4)) > difficulty_level_count:
-            difficulty_level_count += 1
-            current_obstacle_count += 1
-
-        for particle in particles:
-            particle.y += particle.speed
-            if particle.y > HEIGHT:
-                particle.y = 0
-                particle.x = random.randint(0, WIDTH)
-
-        if obstacle_timing > obstacle_increment:
-            for i in range(current_obstacle_count):
-                obstacle_x = random.randint(0, WIDTH - OBSTACLE_WIDTH)
-                obstacle = pygame.Rect(obstacle_x, -OBSTACLE_HEIGHT, OBSTACLE_WIDTH, OBSTACLE_HEIGHT)
-                obstacles.append(obstacle)
-            obstacle_timing = 0
-
-        for bullet in bullets:
-            bullet.y -= BULLET_VELOCITY
-            if bullet.y < 0:
-                bullets.remove(bullet)
-
-            for obstacle in obstacles[:]:
-                if bullet.colliderect(obstacle):
-                    user_score += 1
-                    HIT_FX.play()
-                    if bullet in bullets:
-                        obstacles.remove(obstacle)
-                        bullets.remove(bullet)
-                    break
+        pygame.display.update()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False
-                break
-            # if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-            #     bullet = pygame.Rect(player.centerx - BULLET_WIDTH // 2, player.top, BULLET_WIDTH, BULLET_HEIGHT)
-            #     bullets.append(bullet)
+                game_over_loop = False
+                return False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if restart_button.collidepoint(event.pos):
+                    return True
+                if close_button.collidepoint(event.pos):
+                    game_over_loop = False
+                    return False
+    return False
 
-        # reduce cooldown
-        if shoot_cooldown > 0:
-            shoot_cooldown -= dt
+def main():
+    while True:
+        clock = pygame.time.Clock()
+        started_time = pygame.time.get_ticks()
+        time_passed = 0
+        user_score = 0
+        player_live = PLAYERS_LIVES
 
-        keys = pygame.key.get_pressed()
+        player_direction = "middle"
 
-        # --- Continuous shooting ---
-        if keys[pygame.K_SPACE] and shoot_cooldown <= 0:
-            SHOT_FX.play()
-            bullet = pygame.Rect(player.centerx - BULLET_WIDTH // 2, player.top, BULLET_WIDTH, BULLET_HEIGHT)
-            bullets.append(bullet)
-            shoot_cooldown = shoot_delay   # reset cooldown
+        obstacle_increment = 310
+        obstacle_timing = 0
+        obstacles = []
 
+        shoot_cooldown = 0   
+        shoot_delay = 100   
 
-       # Inside the while run: loop
-        keys = pygame.key.get_pressed()
-        player_direction = "middle"  # Default to middle view if no keys are pressed
+        fire_animation_frames = 6
+        fire_animation_speed = 1
+        current_fire_frame = 0
+        fire_frame_timer = 0
 
-        if keys[pygame.K_LEFT]:
-            if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
-                player_direction = "left_left"
-            else:
-                player_direction = "left"
-            player.x -= PLAYER_VELOCITY
-        elif keys[pygame.K_RIGHT]:
-            if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
-                player_direction = "right_right"
-            else:
-                player_direction = "right"
-            player.x += PLAYER_VELOCITY
+        current_obstacle_velocity = OBSTACLE_VELOCITY
+        current_obstacle_count = 2
+        difficulty_level = 0
+        difficulty_level_count = 0
 
-        # The rest of your movement code (for up and down) goes here
-        if keys[pygame.K_UP]:
-            player.y -= PLAYER_VELOCITY
-        if keys[pygame.K_DOWN]:
-            player.y += PLAYER_VELOCITY
+        bullets = []
+        particles = []
 
-        # Boundary checks to prevent the player from leaving the screen
-        player.x = max(0, min(player.x, WIDTH - player.width))
-        player.y = max(0, min(player.y, HEIGHT - player.height))
+        for _ in range(250):
+            particles.append(Particle())
 
-        for obstacle in obstacles[:]:
-            obstacle.y += current_obstacle_velocity
-            if obstacle.y > HEIGHT:
-                obstacles.remove(obstacle)
-            
-            elif obstacle.y >= player.y and obstacle.colliderect(player):
-                EXPLOSION_FX.play()
-                obstacles.remove(obstacle)
-                player_live -= 1
-                if player_live <= 0:
-                    pass #Game Over
-                break
+        run = True
+        player = pygame.Rect(WIDTH // 2 - PLAYER_WIDTH // 2, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
 
-        draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame=current_fire_frame, player_direction=player_direction, player_live=player_live)
+        pygame.mixer.music.load('assets/audio/music/bg_music.mid')
+        pygame.mixer.music.play(-1)
+        while run:
+            dt = clock.tick(FPS)
+            obstacle_timing += dt
+            time_passed = (pygame.time.get_ticks() - started_time) / 1000
 
+            fire_frame_timer += 1
+            if fire_frame_timer > fire_animation_speed:
+                current_fire_frame = (current_fire_frame + 1) % fire_animation_frames
+                fire_frame_timer = 0
+
+            DIF_NUM = 10
+            if time_passed // DIF_NUM > difficulty_level:
+                difficulty_level += 1
+                current_obstacle_velocity += 0.8
+
+            if (time_passed // (DIF_NUM * 4)) > difficulty_level_count:
+                difficulty_level_count += 1
+                current_obstacle_count += 1
+
+            for particle in particles:
+                particle.y += particle.speed
+                if particle.y > HEIGHT:
+                    particle.y = 0
+                    particle.x = random.randint(0, WIDTH)
+
+            if obstacle_timing > obstacle_increment:
+                for i in range(current_obstacle_count):
+                    obstacle_x = random.randint(0, WIDTH - OBSTACLE_WIDTH)
+                    obstacle = pygame.Rect(obstacle_x, -OBSTACLE_HEIGHT, OBSTACLE_WIDTH, OBSTACLE_HEIGHT)
+                    obstacles.append(obstacle)
+                obstacle_timing = 0
+
+            for bullet in bullets:
+                bullet.y -= BULLET_VELOCITY
+                if bullet.y < 0:
+                    bullets.remove(bullet)
+
+                for obstacle in obstacles[:]:
+                    if bullet.colliderect(obstacle):
+                        user_score += 1
+                        HIT_FX.play()
+                        if bullet in bullets:
+                            obstacles.remove(obstacle)
+                            bullets.remove(bullet)
+                        break
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    run = False
+                    
+            if shoot_cooldown > 0:
+                shoot_cooldown -= dt
+
+            keys = pygame.key.get_pressed()
+
+            if keys[pygame.K_SPACE] and shoot_cooldown <= 0:
+                SHOT_FX.play()
+                bullet = pygame.Rect(player.centerx - BULLET_WIDTH // 2, player.top, BULLET_WIDTH, BULLET_HEIGHT)
+                bullets.append(bullet)
+                shoot_cooldown = shoot_delay
+
+            player_direction = "middle"
+
+            if keys[pygame.K_LEFT]:
+                if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    player_direction = "left_left"
+                else:
+                    player_direction = "left"
+                player.x -= PLAYER_VELOCITY
+            elif keys[pygame.K_RIGHT]:
+                if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    player_direction = "right_right"
+                else:
+                    player_direction = "right"
+                player.x += PLAYER_VELOCITY
+
+            if keys[pygame.K_UP]:
+                player.y -= PLAYER_VELOCITY
+            if keys[pygame.K_DOWN]:
+                player.y += PLAYER_VELOCITY
+
+            player.x = max(0, min(player.x, WIDTH - player.width))
+            player.y = max(0, min(player.y, HEIGHT - player.height))
+
+            for obstacle in obstacles[:]:
+                obstacle.y += current_obstacle_velocity
+                if obstacle.y > HEIGHT:
+                    obstacles.remove(obstacle)
+                
+                elif obstacle.y >= player.y and obstacle.colliderect(player):
+                    EXPLOSION_FX.play()
+                    obstacles.remove(obstacle)
+                    player_live -= 1
+                    if player_live <= 0:
+                        run = False
+                    break
+
+            draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame=current_fire_frame, player_direction=player_direction, player_live=player_live)
+
+        if not show_game_over_screen(user_score, time_passed):
+            break
 
     pygame.quit()
-
-
-
 
 if __name__ == "__main__":
     main()
