@@ -50,6 +50,9 @@ FIRE_FRAMES = [
     pygame.transform.scale(pygame.image.load(f"assets/player/exhaust/Exhaust_0{i}.png"), (PLAYER_WIDTH, 30)) for i in range(1, 7)
 ]
 
+# Explosion Images
+EXPLOSION_IMAGES = [pygame.transform.scale(pygame.image.load(os.path.join("assets", "Explosion", f"Explosion0{i}.png")), (100, 100)) for i in range(1, 10)]
+
 OBSTALCE_IMAGE = pygame.transform.scale(pygame.image.load("assets/obstacle/obstacle.png"), (OBSTACLE_WIDTH, OBSTACLE_HEIGHT))
 OBSTACLE_FIRE_FRAMES = [
     pygame.transform.scale(pygame.image.load(f"assets/obstacle/Exhaust_0{i}.png"), (OBSTACLE_WIDTH, 30)) for i in range(1, 7)
@@ -82,8 +85,28 @@ class Particle:
             self.speed = random.uniform(1.5, 2.5) 
             self.color = (random.randint(120, 220), random.randint(120, 220), random.randint(120, 220))
 
+class Explosion(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.images = EXPLOSION_IMAGES
+        self.image = self.images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+        self.frame = 0
+        self.last_update = pygame.time.get_ticks()
+        self.frame_rate = 50  # milliseconds per frame
+        self.done = False
 
-def draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame, player_direction, player_live):
+    def update(self):
+        now = pygame.time.get_ticks()
+        if now - self.last_update > self.frame_rate:
+            self.last_update = now
+            self.frame += 1
+            if self.frame < len(self.images):
+                self.image = self.images[self.frame]
+            else:
+                self.done = True
+
+def draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame, player_direction, player_live, explosions):
     WIN.fill((0, 0, 30))
     for particle in particles:
         pygame.draw.circle(WIN, particle.color, (int(particle.x), int(particle.y)), particle.size)
@@ -98,6 +121,10 @@ def draw(player, time_passed, obstacles, bullets, particles, user_score, current
         WIN.blit(OBSTALCE_IMAGE, obstacle)
     WIN.blit(FIRE_FRAMES[current_fire_frame], (player.x, player.y + player.height-15))
     WIN.blit(PLAYER_IMAGES[player_direction], (player.x, player.y))
+
+    # Draw all active explosions
+    for explosion in explosions:
+        WIN.blit(explosion.image, explosion.rect)
 
     lives_text = HEART_FONT.render("❤️" * player_live, True, "red")
     lives_text_rect = lives_text.get_rect(center=(WIDTH/2, 25))
@@ -242,6 +269,9 @@ def main():
         obstacle_increment = 310
         obstacle_timing = 0
         obstacles = []
+        explosions = []  # List to hold active explosions
+        bullets = []
+        particles = []
         shoot_cooldown = 0
         shoot_delay = 100
         player_live = PLAYERS_LIVES
@@ -253,8 +283,7 @@ def main():
         current_obstacle_count = 2
         difficulty_level = 0
         difficulty_level_count = 0
-        bullets = []
-        particles = []
+        
         for _ in range(250):
             particles.append(Particle())
         player = pygame.Rect(200, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
@@ -300,10 +329,13 @@ def main():
                 if bullet.y < 0:
                     bullets.remove(bullet)
 
+                # Check for bullet-obstacle collision
                 for obstacle in obstacles[:]:
                     if bullet.colliderect(obstacle):
                         user_score += 1
                         HIT_FX.play()
+                        # Create explosion effect
+                        explosions.append(Explosion(obstacle.centerx, obstacle.centery))
                         if bullet in bullets:
                             obstacles.remove(obstacle)
                             bullets.remove(bullet)
@@ -355,15 +387,24 @@ def main():
                 if obstacle.y > HEIGHT:
                     obstacles.remove(obstacle)
                 
+                # Check for player-obstacle collision
                 elif obstacle.y >= player.y and obstacle.colliderect(player):
                     EXPLOSION_FX.play()
+                    # Create explosion effect
+                    explosions.append(Explosion(player.centerx, player.centery))
                     obstacles.remove(obstacle)
                     player_live -= 1
                     if player_live <= 0:
                         run = False
                     break
+            
+            # Update and clean up explosions
+            for explosion in explosions[:]:
+                explosion.update()
+                if explosion.done:
+                    explosions.remove(explosion)
 
-            draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame=current_fire_frame, player_direction=player_direction, player_live=player_live)
+            draw(player, time_passed, obstacles, bullets, particles, user_score, current_fire_frame=current_fire_frame, player_direction=player_direction, player_live=player_live, explosions=explosions)
 
         if not show_game_over_screen(user_score, time_passed):
             break
